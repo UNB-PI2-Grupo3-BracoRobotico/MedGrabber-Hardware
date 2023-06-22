@@ -328,23 +328,6 @@ class RoboManipulador(object):
   
 FSM = RoboManipulador()
 
-transitions = [
-    { 'trigger': 'A', 'source': 'RecepDados', 'dest': 'MovX' },
-    { 'trigger': 'B', 'source': 'MovX', 'dest': 'MovY' },
-    { 'trigger': 'C', 'source': 'MovY', 'dest': 'Conf' },
-    { 'trigger': 'D', 'source': 'Conf', 'dest': 'MovCarro' },
-    { 'trigger': 'E', 'source': 'MovCarro', 'dest': 'FechGar' },
-    { 'trigger': 'F', 'source': 'FechGar', 'dest': 'MovCarroInit' },
-    { 'trigger': 'G', 'source': 'MovCarroInit', 'dest': 'MovXInit' },
-    { 'trigger': 'H', 'source': 'MovXInit', 'dest': 'MovYInit' },
-    { 'trigger': 'I', 'source': 'MovYInit', 'dest': 'AbrGar' },
-    { 'trigger': 'J', 'source': 'AbrGar', 'dest': 'Err' },
-    { 'trigger': 'K', 'source': 'Err', 'dest': 'ConfPos' },
-    { 'trigger': 'L', 'source': 'ConfPos', 'dest': 'NewX' },
-    { 'trigger': 'M', 'source': 'NewX', 'dest': 'NewY' },
-    { 'trigger': 'N', 'source': 'NewY', 'dest': 'RecepDados' },
-]
-
 machine = Machine(FSM, states=states, transitions=transitions, initial='RecepDados')
 
 # Configurações do consumidor Kafka
@@ -394,4 +377,3 @@ except KeyboardInterrupt:
     camera.close()          # Encerrou a câmera
     consumer.close()        # Encerrou o Kafka
     GPIO.cleanup()          # Encerrou as portas
-
