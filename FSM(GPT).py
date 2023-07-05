@@ -5,6 +5,10 @@ import RPi.GPIO as GPIO
 import picamera
 import time
 
+# Configurações do Kafka
+KAFKA_BOOTSTRAP_SERVERS = 'localhost:9092'
+KAFKA_TOPIC = 'nome_do_topico'
+
 # Definição de tamanho das caixas:
 # P -> 180 # Angulo para que o servo pegue a caixa Pequena
 # M -> 120 # Angulo para que o servo pegue a caixa Média
@@ -45,6 +49,7 @@ GPIO.setup(MS3_PIN, GPIO.OUT)
 DutyCycle = 0.001  # Delay entre os pulsos (segundos) -> 1ms = 1KHz 
 STEPS_PER_REV = 200  # Quantidade de passos para uma rotação completa
 DISTANCE_PER_REV = 4  # Distância percorrida em uma rotação completa (cm)
+# Ou seja, 50 passos por cm andado. Cada passo andará 0,2 mm.
 
 # Criação do objeto PWM
 servo_pwm = GPIO.PWM(STEP_PIN, 500)  # Frequência de 50 Hz (20 ms de período)
@@ -87,7 +92,16 @@ class RoboManipulador(object):
     #{ 'trigger': 'N',     'source': 'Bloq', 'dest': 'RecepDados' },
     #{ 'trigger': 'N',     'source': 'NewY', 'dest': 'RecepDados' },
     ]
-    
+    def on_enter_RecepDados(self)
+        #Habilitando recepçao da informação:
+        print("Aguardando novo objeto...")
+        
+        # Adicione o código necessário para enviar a mensagem "pronto" para o Kafka
+        producer = Producer({'bootstrap.servers': KAFKA_BOOTSTRAP_SERVERS})
+        message = "pronto"
+        producer.produce(KAFKA_TOPIC, value=message)
+        producer.flush()        
+        
     def on_exit_RecepDados(self)
         # Desligando Reset e Sleep 
         GPIO.output(GPIO16, GPIO.HIGH) # Sleep e Reset são invertidos, então desligo com 1 e ligo com 0.
@@ -98,8 +112,8 @@ class RoboManipulador(object):
     def on_enter_MovX(self, x):
         print("Movendo eixo X...")
         
-        # Salvando x por segurança:
-        x_desej = x
+        # Salvando x por segurança convertendo posição para distância:
+        x_desej = x * 19,7 # 19.7 é a distância em cm entre as linhas
         
         # Selecionando o eixc X: CBA = 000
         GPIO.output(A_PIN, GPIO.LOW)
@@ -114,8 +128,10 @@ class RoboManipulador(object):
         # Altera a direção do motor de passo para mover o eixo X
         GPIO.output(DIR_PIN, GPIO.HIGH)  # Defina a direção do motor (pode ser LOW ou HIGH)
 
-        # Calcular a quantidade de passos para a distância desejada
-        steps = int((x_desej / DISTANCE_PER_REV) * STEPS_PER_REV)
+        # Calcular a quantidade de passos para a distância desejada:
+        # voltas = distância_desejada/(distância/revolução)
+        # passos = voltas * passos/volta
+        steps = int((x_desej / DISTANCE_PER_REV) * STEPS_PER_REV) # rev = dist_desej/dist_por_rev)
 
         # Gerar os pulsos (steps) necessários para mover o motor de passo para eixo X
         for _ in range(steps):
@@ -134,8 +150,8 @@ class RoboManipulador(object):
     def on_enter_MovY(self, y):
         print("Movendo eixo Y...")
         
-        # Salvando y por segurança:
-        y_desej = y
+        # Salvando y por segurança convertendo posição para distância::
+        y_desej = y # ??? é a distância em cm entre as colunas
         
         # Selecionando o eixc Y: CBA = 010
         GPIO.output(A_PIN, GPIO.HIGH)
@@ -348,6 +364,10 @@ consumer.subscribe([topic])
 
 try:
     while True:
+        
+        x = 2  # Valor teste para x em posição. 
+        y = 20  # Valor teste para y em cm
+        
         # Aguarda a chegada de mensagens Kafka
         msg = consumer.poll(1.0)
 
@@ -377,3 +397,4 @@ except KeyboardInterrupt:
     camera.close()          # Encerrou a câmera
     consumer.close()        # Encerrou o Kafka
     GPIO.cleanup()          # Encerrou as portas
+
