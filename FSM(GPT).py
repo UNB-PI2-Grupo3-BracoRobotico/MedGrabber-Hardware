@@ -1,8 +1,9 @@
 import json
 import logging
+from datetime import datetime
 
 from transitions import Machine, State
-from confluent_kafka import Consumer
+from confluent_kafka import Consumer, Producer
 
 # from RPiMotorLib import A4988Nema
 import RPi.GPIO as GPIO
@@ -497,6 +498,17 @@ class RoboManipulador(object):
         FSM.N()
 
 
+def delivery_report(err, msg):
+    if err is not None:
+        logger.error("Message delivery failed: {}".format(err))
+    else:
+        logger.info(
+            "Message delivered to {} [{}]".format(msg.topic(), msg.partition())
+        )
+
+def encode_message(message):
+    return json.dumps(message).encode("utf-8")
+
 FSM = RoboManipulador()
 
 machine = Machine(FSM, states=states, transitions=transitions, initial="PosIni")
@@ -516,6 +528,8 @@ topic = "order-products"
 
 # Subscreve ao tópico
 consumer.subscribe([topic])
+
+producer = Producer({"bootstrap.servers": "kafka:9092"})
 
 try:
     # x = 3  # Valor teste para x em posição.
@@ -539,6 +553,8 @@ try:
             logger.info('Pedido recebido')
 
             product_list_msg = json.loads(msg.value())  # Decodifica a mensagem JSON
+
+            order_id = product_list_msg.get('order_id')
 
             for data in product_list_msg.get("product_list"):
                 tamanho = data.get("tamanho")  # Obtém o tamanho do objeto
@@ -570,9 +586,28 @@ try:
             #if FSM.is_RecepDados():
             FSM.B()  # Retorna à posição inicial com o gatilho B
 
+            message = {
+                'order_id': order_id,
+                'status': 'finished'
+            }
+
+            producer.produce(
+                'order-status',
+                encode_message({
+                    "timestamp": datetime.now().timestamp(),
+                    "sender": 'robotic-arm',
+                    "message": message,
+                }),
+                callback=delivery_report
+            )
+
+            producer.flush()
+
 except KeyboardInterrupt:  # Apertando Ctrl+C
     print("Keyboard interrupt")
     #    camera.stop_preview()
     #    camera.close()          # Encerrou a câmera
     #    consumer.close()        # Encerrou o Kafka
     GPIO.cleanup()  # Encerrou as portas
+
+
