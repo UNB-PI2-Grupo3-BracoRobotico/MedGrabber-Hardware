@@ -532,8 +532,8 @@ producer = Producer({"bootstrap.servers": "kafka:9092"})
 try:
 
     parser = argparse.ArgumentParser(description="This is my robotic arm script.")
-    parser.add_argument('-x', metavar='x', type=str, default=None, help='Coordinate X')
-    parser.add_argument('-y', metavar='y', type=str, default=None, help='Coordinate Y')
+    parser.add_argument('-x', metavar='x', type=int, default=None, help='Coordinate X')
+    parser.add_argument('-y', metavar='y', type=int, default=None, help='Coordinate Y')
     parser.add_argument('-t', metavar='t', type=str, default=None, help='Size of the box')
     args = parser.parse_args()
 
@@ -541,7 +541,7 @@ try:
     y = args.y
     tamanho = args.t
 
-    if x or y:
+    if x and y:
         logger.info(f"Item: tamanho {tamanho}, coords: {x}, {y}")
 
         if tamanho == "P":
