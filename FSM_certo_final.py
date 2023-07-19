@@ -25,9 +25,11 @@ KAFKA_BOOTSTRAP_SERVERS = "kafka:9092"
 # KAFKA_TOPIC = 'nome_do_topico'
 
 # Definição de tamanho das caixas:
-P = 180  # Angulo para que o servo pegue a caixa Pequena
-M = 120  # Angulo para que o servo pegue a caixa Média
-G = 60  # Angulo para que o servo pegue a caixa Grande
+Aberto  = 180
+G       = 150  # Angulo para que o servo pegue a caixa Pequena
+M       = 120  # Angulo para que o servo pegue a caixa Média
+P       = 80   # Angulo para que o servo pegue a caixa Grande
+Fechado = 0
 oldx = 0  # Para teste de validade de x
 oldy = 0  # Para teste de validade de y
 
@@ -60,7 +62,11 @@ GPIO.setup(MS1_PIN, GPIO.OUT)
 GPIO.setup(MS2_PIN, GPIO.OUT)
 GPIO.setup(MS3_PIN, GPIO.OUT)
 GPIO.setup(GPIO16, GPIO.OUT)
-GPIO.setup(SERVO_PIN, GPIO.OUT)
+servo = GPIO.PWM(SERVO_PIN, 50) # Para configuração do Servo. 50Hz(20ms)
+
+# Iniciando o servo da garra:
+servo.start(0)
+servo.ChangeDutyCycle(2)
 
 # Selecionando saída do demux:
 # CH 0 -> CBA = 000
@@ -85,21 +91,18 @@ STEPS_PER_REV = 200  # Quantidade de passos para uma rotação completa
 DISTANCE_PER_REV = 4  # Distância percorrida em uma rotação completa (cm)
 # Ou seja, 50 passos por cm andado. Cada passo andará 0,2 mm.
 
-# Criação do objeto PWM
-servo_pwm = GPIO.PWM(STEP_PIN, 500)  # Frequência de 50 Hz (20 ms de período)
-
-
 # Função para posicionar o servo em um ângulo específico
 def set_servo_angle(angle):
-    pulse_duration = (angle / 45) * 400  # Cálculo da duração do pulso em microssegundos
-    duty_cycle = (pulse_duration / 2000) * 100  # Cálculo do ciclo de trabalho em porcentagem
-    for _ in range(400):
-        GPIO.output(SERVO_PIN, GPIO.HIGH)
-        time.sleep(duty_cycle * DutyCycleS / 100)
-        GPIO.output(SERVO_PIN, GPIO.LOW)
-        time.sleep((100 - duty_cycle) / 100 * DutyCycleS)
-    time.sleep(3)
-
+    duty_cycle = (angle / 18) + 2
+    servo.ChangeDutyCycle(duty_cycle)
+    # pulse_duration = (angle / 45) * 400  # Cálculo da duração do pulso em microssegundos
+    # duty_cycle = (pulse_duration / 2000) * 100  # Cálculo do ciclo de trabalho em porcentagem
+    # for _ in range(400):
+        # GPIO.output(SERVO_PIN, GPIO.HIGH)
+        # time.sleep(duty_cycle * DutyCycleS / 100)
+        # GPIO.output(SERVO_PIN, GPIO.LOW)
+        # time.sleep((100 - duty_cycle) / 100 * DutyCycleS)
+    time.sleep(2)
 
 # Iniciando a câmera:
 # camera = picamera.PiCamera()
@@ -147,17 +150,18 @@ class RoboManipulador(object):
     pass
 
     def on_enter_PosIni(self):
-        logger.info("Aguardando nova lista...")
+        # Não queremos inibir os DEMUX
+        GPIO.output(INHIBIT_PIN, GPIO.LOW)
 
-        # Primeiro objeto da lista. Ir para posiçao de entrega.
-        primeiro = True
+        # Desligando Reset e Sleep
+        GPIO.output(GPIO16, GPIO.HIGH)  # Sleep e Reset são invertidos, então desligo com 1 e ligo com 0.
 
         # Selecionando o eixc Y: CBA = 010
-        GPIO.output(A_PIN, GPIO.LOW)
-        GPIO.output(B_PIN, GPIO.HIGH)
+        GPIO.output(A_PIN, GPIO.HIGH)
+        GPIO.output(B_PIN, GPIO.LOW)
         GPIO.output(C_PIN, GPIO.LOW)
 
-        # Ativar o motor de passo para mover o eixo Y. Mudando a direção para descer.
+        # Ativar o motor de passo para mover o eixo Y. Mudando a direção para subir.
         GPIO.output(DIR_PIN, GPIO.HIGH)  # Defina a direção do motor (pode ser LOW ou HIGH)
 
         # Calcular a quantidade de passos para a distância desejada
@@ -168,6 +172,8 @@ class RoboManipulador(object):
             time.sleep(0.5 * DutyCycle)  # Usando o mesmo delay teremos 50% de duty cycle.
             GPIO.output(STEP_PIN, GPIO.LOW)
             time.sleep(0.5 * DutyCycle)
+        
+        logger.info("Aguardando nova lista...")
 
     def on_exit_PosIni(self):
         logger.info("Iniciando lista de pedidos...")
@@ -243,9 +249,7 @@ class RoboManipulador(object):
         # Gerar os pulsos (steps) necessários para mover o motor de passo para eixo X
         for _ in range(steps):
             GPIO.output(STEP_PIN, GPIO.HIGH)
-            time.sleep(
-                0.5 * DutyCycle
-            )  # Usando o mesmo delay teremos 50% de duty cycle.
+            time.sleep(0.5 * DutyCycle)
             GPIO.output(STEP_PIN, GPIO.LOW)
             time.sleep(0.5 * DutyCycle)
 
@@ -285,6 +289,7 @@ class RoboManipulador(object):
 
     def on_exit_MovY(self):
         GPIO.output(STEP_PIN, GPIO.LOW)
+        set_servo_angle(Aberto)
 
     def on_enter_Conf(self):
         logger.info("Confirmando posição objeto...")
@@ -294,12 +299,13 @@ class RoboManipulador(object):
             FSM.F()
 
     def on_enter_MovCarro(self):
+        global z
+        z = 8
         logger.info("Movendo braço da garra...")
 
         # Calcular a distância a ser andada em cm e salvar em z!!
         # Codificar aqui o código da câmera
-        global z
-        z = 8
+        
 
         # Selecionando o eixo Z: CBA = 010
         GPIO.output(A_PIN, GPIO.LOW)
@@ -337,6 +343,7 @@ class RoboManipulador(object):
 
     def on_enter_MovCarroInit(self):
         global z
+        z = 8
         logger.info("Retornando braço da garra...")
         
         # Selecionando o eixo Z: CBA = 010
@@ -417,6 +424,8 @@ class RoboManipulador(object):
         GPIO.output(STEP_PIN, GPIO.LOW)
 
     def on_enter_MovCarro2(self):
+        global z
+        z = 8
         logger.info("Movendo braço da garra para entrega...")
 
         # Selecionando o eixo Z: CBA = 010
@@ -437,6 +446,9 @@ class RoboManipulador(object):
             time.sleep(0.8 * DutyCycle)
 
         FSM.L()
+        
+    def on_exit_MovCarro2(self):
+        GPIO.output(STEP_PIN, GPIO.LOW)
 
     def on_enter_AbrGar(self):
         logger.info("Deixando objeto...")
@@ -447,7 +459,7 @@ class RoboManipulador(object):
         GPIO.output(C_PIN, GPIO.LOW)
 
         # Controlando a garra para que abra:
-        set_servo_angle(0)  # Para retornar ao ângulo inicial
+        set_servo_angle(Aberto)  # Para retornar ao ângulo inicial
 
         FSM.M()
 
@@ -455,6 +467,8 @@ class RoboManipulador(object):
     #        servo_pwm.stop()
 
     def on_enter_MovCarroInit2(self):
+        global z
+        z = 8
         logger.info("Retornando braço da garra...")
 
         # Selecionando o eixo Z: CBA = 010
@@ -475,7 +489,10 @@ class RoboManipulador(object):
             time.sleep(0.8 * DutyCycle)
 
         FSM.N()
-
+    
+    def on_exit_MovCarroInit2(self):
+        GPIO.output(STEP_PIN, GPIO.LOW)
+        set_servo_angle(Fechado)
 
 def delivery_report(err, msg):
     if err is not None:
