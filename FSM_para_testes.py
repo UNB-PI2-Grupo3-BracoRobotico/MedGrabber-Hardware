@@ -511,26 +511,8 @@ FSM = RoboManipulador()
 
 machine = Machine(FSM, states=states, transitions=transitions, initial="PosIni")
 
-# Configurações do consumidor Kafka
-conf = {
-    "bootstrap.servers": "kafka:9092",  # Endereço do servidor Kafka
-    "group.id": "motor-consumer",
-    "auto.offset.reset": "earliest",
-}
-
-# Criação do consumidor Kafka
-consumer = Consumer(conf)
-
-# Tópico a ser consumido
-topic = "order-products"
-
-# Subscreve ao tópico
-consumer.subscribe([topic])
-
-producer = Producer({"bootstrap.servers": "kafka:9092"})
 
 try:
-
     parser = argparse.ArgumentParser(description="This is my robotic arm script.")
     parser.add_argument('-x', metavar='x', type=int, default=None, help='Coordinate X')
     parser.add_argument('-y', metavar='y', type=int, default=None, help='Coordinate Y')
@@ -560,6 +542,24 @@ try:
         logger.info("Fim do pedido")
         FSM.B()  # Retorna à posição inicial com o gatilho B
         sys.exit()
+
+    # Configurações do consumidor Kafka
+    conf = {
+        "bootstrap.servers": "kafka:9092",  # Endereço do servidor Kafka
+        "group.id": "motor-consumer",
+        "auto.offset.reset": "earliest",
+    }
+
+    # Criação do consumidor Kafka
+    consumer = Consumer(conf)
+
+    # Tópico a ser consumido
+    topic = "order-products"
+
+    # Subscreve ao tópico
+    consumer.subscribe([topic])
+
+    producer = Producer({"bootstrap.servers": "kafka:9092"})
 
     while True:
         logger.info("Aguardando mensagem de pedido")
