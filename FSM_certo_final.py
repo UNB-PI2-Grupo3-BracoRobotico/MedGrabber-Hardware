@@ -25,10 +25,10 @@ KAFKA_BOOTSTRAP_SERVERS = "kafka:9092"
 # KAFKA_TOPIC = 'nome_do_topico'
 
 # Definição de tamanho das caixas:
-Aberto  = 180
-G       = 150  # Angulo para que o servo pegue a caixa Pequena
-M       = 120  # Angulo para que o servo pegue a caixa Média
-P       = 80   # Angulo para que o servo pegue a caixa Grande
+Aberto  = 90
+G       = 55  # Angulo para que o servo pegue a caixa Pequena
+M       = 45  # Angulo para que o servo pegue a caixa Média
+P       = 29  # Angulo para que o servo pegue a caixa Grande
 Fechado = 0
 oldx = 0  # Para teste de validade de x
 oldy = 0  # Para teste de validade de y
@@ -62,6 +62,7 @@ GPIO.setup(MS1_PIN, GPIO.OUT)
 GPIO.setup(MS2_PIN, GPIO.OUT)
 GPIO.setup(MS3_PIN, GPIO.OUT)
 GPIO.setup(GPIO16, GPIO.OUT)
+GPIO.setup(SERVO_PIN, GPIO.OUT)
 servo = GPIO.PWM(SERVO_PIN, 50) # Para configuração do Servo. 50Hz(20ms)
 
 # Iniciando o servo da garra:
@@ -275,7 +276,7 @@ class RoboManipulador(object):
         GPIO.output(DIR_PIN, GPIO.HIGH)  # Defina a direção do motor (pode ser LOW ou HIGH)
 
         # Calcular a quantidade de passos para a distância desejada
-        steps = int(y_desej)
+        steps = int(y_desej) + 200
 
         for _ in range(steps):
             GPIO.output(STEP_PIN, GPIO.HIGH)
@@ -300,7 +301,7 @@ class RoboManipulador(object):
 
     def on_enter_MovCarro(self):
         global z
-        z = 8
+        z = 7.5
         logger.info("Movendo braço da garra...")
 
         # Calcular a distância a ser andada em cm e salvar em z!!
@@ -338,12 +339,27 @@ class RoboManipulador(object):
 
         # Controlando a garra para que feche no ângulo desejado:
         set_servo_angle(tamanho)
-
+        time.sleep(0.5)
+        
+        # Selecionando o Y: CBA = 001
+        GPIO.output(A_PIN, GPIO.HIGH)
+        GPIO.output(B_PIN, GPIO.LOW)
+        GPIO.output(C_PIN, GPIO.LOW)
+        
+        # Ativar o motor de passo para mover o eixo Z
+        GPIO.output(DIR_PIN, GPIO.LOW)  # Defina a direção do motor (pode ser LOW ou HIGH)
+        
+        for _ in range(400):
+            GPIO.output(STEP_PIN, GPIO.HIGH)
+            time.sleep(0.2 * DutyCycle)
+            GPIO.output(STEP_PIN, GPIO.LOW)
+            time.sleep(0.8 * DutyCycle)
+        
         FSM.H()
-
+    
     def on_enter_MovCarroInit(self):
         global z
-        z = 8
+        z = 7.5
         logger.info("Retornando braço da garra...")
         
         # Selecionando o eixo Z: CBA = 010
@@ -410,7 +426,7 @@ class RoboManipulador(object):
         GPIO.output(DIR_PIN, GPIO.LOW)  # Defina a direção do motor (pode ser LOW ou HIGH)
 
         # Calcular a quantidade de passos para a distância desejada
-        steps = int(y_desej)
+        steps = int(y_desej) + 200
 
         for _ in range(steps):
             GPIO.output(STEP_PIN, GPIO.HIGH)
@@ -425,7 +441,7 @@ class RoboManipulador(object):
 
     def on_enter_MovCarro2(self):
         global z
-        z = 8
+        z = 12
         logger.info("Movendo braço da garra para entrega...")
 
         # Selecionando o eixo Z: CBA = 010
@@ -468,7 +484,7 @@ class RoboManipulador(object):
 
     def on_enter_MovCarroInit2(self):
         global z
-        z = 8
+        z = 12
         logger.info("Retornando braço da garra...")
 
         # Selecionando o eixo Z: CBA = 010
@@ -491,6 +507,21 @@ class RoboManipulador(object):
         FSM.N()
     
     def on_exit_MovCarroInit2(self):
+        time.sleep(0.5)
+        # Selecionando o eixo Z: CBA = 010
+        GPIO.output(A_PIN, GPIO.HIGH)
+        GPIO.output(B_PIN, GPIO.LOW)
+        GPIO.output(C_PIN, GPIO.LOW)
+        
+        # Ativar o motor de passo para mover o eixo Y
+        GPIO.output(DIR_PIN, GPIO.HIGH)  # Defina a direção do motor (pode ser LOW ou HIGH)
+        
+        for _ in range(400):
+            GPIO.output(STEP_PIN, GPIO.HIGH)
+            time.sleep(0.2 * DutyCycle)
+            GPIO.output(STEP_PIN, GPIO.LOW)
+            time.sleep(0.8 * DutyCycle)
+        
         GPIO.output(STEP_PIN, GPIO.LOW)
         set_servo_angle(Fechado)
 
@@ -602,4 +633,3 @@ except KeyboardInterrupt:  # Apertando Ctrl+C
     #    camera.close()          # Encerrou a câmera
     #    consumer.close()        # Encerrou o Kafka
     GPIO.cleanup()  # Encerrou as portas
-
